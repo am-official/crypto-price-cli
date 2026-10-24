@@ -1,0 +1,18 @@
+{
+  "name": "crypto-price-cli",
+  "version": "0.1.0",
+  "description": "Lightweight CLI to fetch cryptocurrency prices (CoinGecko, no API key).",
+  "type": "module",
+  "bin": {
+    "crypto-price": "./bin/crypto-price.js"
+  },
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test",
+    "lint": "node --check src/index.js && node --check bin/crypto-price.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
