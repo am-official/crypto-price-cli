@@ -2,6 +2,25 @@
 
 const API_URL = "https://api.coingecko.com/api/v3/simple/price";
 
+// Common ticker aliases -> CoinGecko ids.
+export const COIN_ALIASES = {
+  btc: "bitcoin",
+  eth: "ethereum",
+  sol: "solana",
+  doge: "dogecoin",
+  xrp: "ripple",
+  ada: "cardano",
+  ltc: "litecoin",
+  bnb: "binancecoin",
+  dot: "polkadot",
+  matic: "matic-network",
+};
+
+export function resolveCoin(input) {
+  const key = String(input || "").trim().toLowerCase();
+  return COIN_ALIASES[key] || key;
+}
+
 const cache = new Map();
 
 function cacheKey(ids, vs) {
@@ -23,6 +42,7 @@ export async function fetchPrices(ids, vs = ["usd"], fetchImpl = fetch, options 
   if (!Array.isArray(ids) || ids.length === 0) {
     throw new Error("ids must be a non-empty array");
   }
+  ids = ids.map(resolveCoin);
   const ttl = typeof options.cacheTtlMs === "number" ? options.cacheTtlMs : 60000;
   const key = cacheKey(ids, vs);
   const cached = cache.get(key);
@@ -75,6 +95,7 @@ export async function fetchHistoricalPrice(coin, dateStr, vs = ["usd"], fetchImp
   if (!coin || typeof coin !== "string") {
     throw new Error("coin must be a non-empty string");
   }
+  coin = resolveCoin(coin);
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr || "");
   if (!m) {
     throw new Error("date must be YYYY-MM-DD");

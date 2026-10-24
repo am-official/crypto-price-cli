@@ -10,6 +10,16 @@ npx crypto-price-cli bitcoin,ethereum usd,eur
 crypto-price bitcoin usd
 ```
 
+Tickers work as aliases (`btc`, `eth`, `sol`, `doge`, `xrp`, `ada`, `ltc`, `bnb`, `dot`, `matic`).
+
+```bash
+# Historical price (YYYY-MM-DD), single or multiple coins
+crypto-price bitcoin usd --date=2024-01-15
+crypto-price btc,eth usd --date=2024-01-15
+# Machine-readable output
+crypto-price bitcoin usd --json
+```
+
 ## Development
 
 ```bash
@@ -20,4 +30,3 @@ npm run lint
 ## License
 
 MIT
-EOF

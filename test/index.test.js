@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice } from "../src/index.js";
+import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin } from "../src/index.js";
 
 test("fetchPrices validates input", async () => {
   await assert.rejects(() => fetchPrices([]), /non-empty array/);
@@ -45,6 +45,24 @@ test("fetchPrices caches results", async () => {
 test("formatJson formats output", () => {
   const out = formatJson({ bitcoin: { usd: 100 } });
   assert.equal(out, JSON.stringify({ bitcoin: { usd: 100 } }, null, 2));
+});
+
+test("resolveCoin maps tickers and passes ids through", () => {
+  assert.equal(resolveCoin("btc"), "bitcoin");
+  assert.equal(resolveCoin("ETH"), "ethereum");
+  assert.equal(resolveCoin("bitcoin"), "bitcoin");
+});
+
+test("fetchPrices resolves aliases in request URL", async () => {
+  clearCache();
+  let seen = "";
+  const mock = async (url) => {
+    seen = String(url);
+    return { ok: true, status: 200, statusText: "OK", json: async () => ({ bitcoin: { usd: 1 } }) };
+  };
+  await fetchPrices(["btc"], ["usd"], mock, { cacheTtlMs: 0 });
+  assert.match(seen, /ids=bitcoin/);
+  clearCache();
 });
 
 test("fetchHistoricalPrice validates date", async () => {
