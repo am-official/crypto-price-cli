@@ -62,3 +62,37 @@ export function formatPrices(data, vs = ["usd"]) {
 export function formatJson(data) {
   return JSON.stringify(data, null, 2);
 }
+
+/**
+ * Fetch the historical price of a coin on a given date.
+ * @param {string} coin - CoinGecko coin id (e.g. "bitcoin")
+ * @param {string} dateStr - date as YYYY-MM-DD
+ * @param {string[]} vs - target currencies (e.g. ["usd"])
+ * @param {Function} fetchImpl - fetch implementation (injectable for tests)
+ * @returns {Promise<Record<string, number>>} map of currency -> price
+ */
+export async function fetchHistoricalPrice(coin, dateStr, vs = ["usd"], fetchImpl = fetch) {
+  if (!coin || typeof coin !== "string") {
+    throw new Error("coin must be a non-empty string");
+  }
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr || "");
+  if (!m) {
+    throw new Error("date must be YYYY-MM-DD");
+  }
+  const apiDate = `${m[3]}-${m[2]}-${m[1]}`;
+  const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/history?date=${apiDate}&localization=false`;
+  const res = await fetchImpl(url, { headers: { accept: "application/json" } });
+  if (!res.ok) {
+    throw new Error(`CoinGecko request failed: ${res.status} ${res.statusText}`);
+  }
+  const data = await res.json();
+  const prices = data && data.market_data && data.market_data.current_price;
+  if (!prices || typeof prices !== "object") {
+    throw new Error("No market data for that date");
+  }
+  const out = {};
+  for (const c of vs) {
+    if (prices[c] !== undefined) out[c] = prices[c];
+  }
+  return out;
+}

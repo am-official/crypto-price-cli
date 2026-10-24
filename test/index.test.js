@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchPrices, formatPrices, formatJson, clearCache } from "../src/index.js";
+import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice } from "../src/index.js";
 
 test("fetchPrices validates input", async () => {
   await assert.rejects(() => fetchPrices([]), /non-empty array/);
@@ -45,4 +45,20 @@ test("fetchPrices caches results", async () => {
 test("formatJson formats output", () => {
   const out = formatJson({ bitcoin: { usd: 100 } });
   assert.equal(out, JSON.stringify({ bitcoin: { usd: 100 } }, null, 2));
+});
+
+test("fetchHistoricalPrice validates date", async () => {
+  await assert.rejects(() => fetchHistoricalPrice("bitcoin", "not-a-date"), /YYYY-MM-DD/);
+});
+
+test("fetchHistoricalPrice parses response", async () => {
+  const mock = async (url) => {
+    assert.match(url, /date=15-01-2024/);
+    return {
+      ok: true, status: 200, statusText: "OK",
+      json: async () => ({ market_data: { current_price: { usd: 42000, eur: 38000 } } }),
+    };
+  };
+  const out = await fetchHistoricalPrice("bitcoin", "2024-01-15", ["usd"], mock);
+  assert.deepEqual(out, { usd: 42000 });
 });
