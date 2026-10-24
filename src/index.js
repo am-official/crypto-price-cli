@@ -2,15 +2,32 @@
 
 const API_URL = "https://api.coingecko.com/api/v3/simple/price";
 
+const cache = new Map();
+
+function cacheKey(ids, vs) {
+  return `${ids.join(",")}|${vs.join(",")}`;
+}
+
 /**
  * Fetch prices for the given coin ids in the given fiat currencies.
+ * Results are cached in-memory for `cacheTtlMs` (default 60s) to reduce
+ * CoinGecko rate-limit hits.
  * @param {string[]} ids - CoinGecko coin ids (e.g. ["bitcoin","ethereum"])
  * @param {string[]} vs - target currencies (e.g. ["usd","eur"])
+ * @param {Function} fetchImpl - fetch implementation (injectable for tests)
+ * @param {object} [options]
+ * @param {number} [options.cacheTtlMs=60000]
  * @returns {Promise<Record<string, Record<string, number>>>}
  */
-export async function fetchPrices(ids, vs = ["usd"], fetchImpl = fetch) {
+export async function fetchPrices(ids, vs = ["usd"], fetchImpl = fetch, options = {}) {
   if (!Array.isArray(ids) || ids.length === 0) {
     throw new Error("ids must be a non-empty array");
+  }
+  const ttl = typeof options.cacheTtlMs === "number" ? options.cacheTtlMs : 60000;
+  const key = cacheKey(ids, vs);
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.ts < ttl) {
+    return cached.data;
   }
   const params = new URLSearchParams({
     ids: ids.join(","),
@@ -25,7 +42,12 @@ export async function fetchPrices(ids, vs = ["usd"], fetchImpl = fetch) {
   if (!data || typeof data !== "object") {
     throw new Error("Unexpected response from CoinGecko");
   }
+  cache.set(key, { ts: Date.now(), data });
   return data;
+}
+
+export function clearCache() {
+  cache.clear();
 }
 
 export function formatPrices(data, vs = ["usd"]) {
