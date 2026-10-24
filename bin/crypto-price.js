@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { fetchPrices, formatPrices, formatJson, fetchHistoricalPrice } from "../src/index.js";
+import { fetchPrices, formatPrices, formatJson, fetchHistoricalPrice, parsePositiveInt } from "../src/index.js";
 
 const args = process.argv.slice(2);
 const apiKey = process.env.COINGECKO_API_KEY || process.env.CG_API_KEY || "";
@@ -18,6 +18,8 @@ Arguments:
 Options:
   --date=YYYY-MM-DD   Historical price on that date (loops over coins)
   --watch[=SECS]      Refresh continuously (default every 30s, Ctrl+C stops)
+  --interval=SECS     Alias for --watch=SECS
+  --count=N           Stop after N refreshes (for scripts/cron)
   --json              Machine-readable JSON output
   -h, --help          Show this help
 
@@ -37,9 +39,11 @@ Examples:
 const json = args.includes("--json");
 const dateArg = args.find((a) => a.startsWith("--date="));
 const date = dateArg ? dateArg.slice("--date=".length) : null;
-const watchArg = args.find((a) => a === "--watch" || a.startsWith("--watch="));
-const watchSecs = watchArg ? Number((watchArg.split("=")[1] || "30")) : 0;
-const filtered = args.filter((a) => a !== "--json" && !a.startsWith("--date=") && a !== "--watch" && !a.startsWith("--watch="));
+const watchArg = args.find((a) => a === "--watch" || a.startsWith("--watch=") || a === "--interval" || a.startsWith("--interval="));
+const watchSecs = watchArg ? parsePositiveInt(watchArg.split("=")[1] || "30", 30) : 0;
+const countArg = args.find((a) => a.startsWith("--count="));
+const maxTicks = countArg ? parsePositiveInt(countArg.split("=")[1], 0) : 0;
+const filtered = args.filter((a) => a !== "--json" && !a.startsWith("--date=") && a !== "--watch" && !a.startsWith("--watch=") && a !== "--interval" && !a.startsWith("--interval=") && !a.startsWith("--count="));
 const coins = (filtered[0] || "bitcoin").split(",").map((s) => s.trim()).filter(Boolean);
 const vs = (filtered[1] || "usd").split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -84,6 +88,7 @@ try {
       },
       intervalMs: watchSecs * 1000,
       signal: controller.signal,
+      ...(maxTicks > 0 ? { maxTicks } : {}),
     });
   } else {
     await showOnce();

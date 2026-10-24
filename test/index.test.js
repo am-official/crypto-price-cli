@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry, watchPrices, timestampHeader, validateFlags } from "../src/index.js";
+import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry, watchPrices, timestampHeader, validateFlags, parsePositiveInt } from "../src/index.js";
+
+test("parsePositiveInt falls back on garbage", () => {
+  assert.equal(parsePositiveInt("10", 30), 10);
+  assert.equal(parsePositiveInt(undefined, 30), 30);
+  assert.equal(parsePositiveInt("abc", 30), 30);
+  assert.equal(parsePositiveInt("0", 30), 30);
+  assert.equal(parsePositiveInt("-5", 30), 30);
+});
 
 test("validateFlags rejects watch combined with date", () => {
   assert.equal(validateFlags({ watchSecs: 30, date: "2024-01-15" }), "--watch and --date cannot be combined: historical prices are static, nothing to refresh.");

@@ -148,6 +148,15 @@ export function formatJson(data) {
 }
 
 /**
+ * Parse a positive-int CLI value, falling back to def on garbage.
+ */
+export function parsePositiveInt(raw, def) {
+  if (raw === undefined || raw === null || raw === "") return def;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : def;
+}
+
+/**
  * Validate CLI flag combinations. Returns an error message or null.
  */
 export function validateFlags({ watchSecs = 0, date = null } = {}) {
