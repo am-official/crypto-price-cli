@@ -17,6 +17,7 @@ Arguments:
 
 Options:
   --date=YYYY-MM-DD   Historical price on that date (loops over coins)
+  --watch[=SECS]      Refresh continuously (default every 30s, Ctrl+C stops)
   --json              Machine-readable JSON output
   -h, --help          Show this help
 
@@ -36,11 +37,13 @@ Examples:
 const json = args.includes("--json");
 const dateArg = args.find((a) => a.startsWith("--date="));
 const date = dateArg ? dateArg.slice("--date=".length) : null;
-const filtered = args.filter((a) => a !== "--json" && !a.startsWith("--date="));
+const watchArg = args.find((a) => a === "--watch" || a.startsWith("--watch="));
+const watchSecs = watchArg ? Number((watchArg.split("=")[1] || "30")) : 0;
+const filtered = args.filter((a) => a !== "--json" && !a.startsWith("--date=") && a !== "--watch" && !a.startsWith("--watch="));
 const coins = (filtered[0] || "bitcoin").split(",").map((s) => s.trim()).filter(Boolean);
 const vs = (filtered[1] || "usd").split(",").map((s) => s.trim()).filter(Boolean);
 
-try {
+async function showOnce() {
   if (date) {
     const data = {};
     for (const coin of coins) {
@@ -56,6 +59,25 @@ try {
   } else {
     const data = await fetchPrices(coins, vs, fetch, opts);
     console.log(json ? formatJson(data) : formatPrices(data, vs));
+  }
+}
+
+try {
+  if (watchArg && !(watchSecs > 0)) {
+    console.error("error: --watch needs a positive number of seconds");
+    process.exit(1);
+  }
+  if (watchSecs > 0) {
+    const controller = new AbortController();
+    process.once("SIGINT", () => controller.abort());
+    const { watchPrices } = await import("../src/index.js");
+    await watchPrices({
+      fetchOnce: () => showOnce(),
+      intervalMs: watchSecs * 1000,
+      signal: controller.signal,
+    });
+  } else {
+    await showOnce();
   }
 } catch (err) {
   console.error(`error: ${err.message}`);

@@ -62,6 +62,27 @@ export async function fetchWithRetry(fetchImpl, url, init, options = {}) {
   throw lastError;
 }
 
+/**
+ * Repeatedly run fetchOnce every intervalMs until the signal aborts or
+ * maxTicks is reached. sleepImpl is injectable so tests run instantly.
+ */
+export async function watchPrices({ fetchOnce, onTick, intervalMs = 30000, signal, maxTicks = Infinity, sleepImpl = sleep }) {
+  if (typeof fetchOnce !== "function") {
+    throw new Error("fetchOnce must be a function");
+  }
+  if (!(intervalMs > 0)) {
+    throw new Error("intervalMs must be positive");
+  }
+  let tick = 0;
+  while (!signal?.aborted && tick < maxTicks) {
+    tick++;
+    await fetchOnce(tick);
+    if (onTick) onTick(tick);
+    if (tick >= maxTicks || signal?.aborted) break;
+    await sleepImpl(intervalMs);
+  }
+}
+
 const cache = new Map();
 
 function cacheKey(ids, vs) {

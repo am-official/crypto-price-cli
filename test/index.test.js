@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry } from "../src/index.js";
+import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry, watchPrices } from "../src/index.js";
 
 test("fetchPrices validates input", async () => {
   await assert.rejects(() => fetchPrices([]), /non-empty array/);
@@ -88,6 +88,33 @@ test("fetchWithRetry does not retry 400", async () => {
   let calls = 0;
   const mock = async () => { calls++; return { ok: false, status: 400, statusText: "Bad", headers: { get: () => null } }; };
   await assert.rejects(() => fetchWithRetry(mock, "https://x", {}, { sleepImpl: () => Promise.resolve() }), /400/);
+  assert.equal(calls, 1);
+});
+
+test("watchPrices ticks until maxTicks", async () => {
+  let calls = 0;
+  const ticks = [];
+  await watchPrices({
+    fetchOnce: async () => { calls++; },
+    onTick: (n) => { ticks.push(n); },
+    intervalMs: 5,
+    maxTicks: 3,
+    sleepImpl: () => Promise.resolve(),
+  });
+  assert.equal(calls, 3);
+  assert.deepEqual(ticks, [1, 2, 3]);
+});
+
+test("watchPrices stops on abort", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  const done = watchPrices({
+    fetchOnce: async () => { calls++; controller.abort(); },
+    intervalMs: 5,
+    signal: controller.signal,
+    sleepImpl: () => Promise.resolve(),
+  });
+  await done;
   assert.equal(calls, 1);
 });
 
