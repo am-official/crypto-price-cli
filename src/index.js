@@ -54,7 +54,9 @@ export async function fetchPrices(ids, vs = ["usd"], fetchImpl = fetch, options 
     vs_currencies: vs.join(","),
   });
   const url = `${API_URL}?${params.toString()}`;
-  const res = await fetchImpl(url, { headers: { accept: "application/json" } });
+  const headers = { accept: "application/json" };
+  if (options.apiKey) headers["x-cg-demo-api-key"] = options.apiKey;
+  const res = await fetchImpl(url, { headers });
   if (!res.ok) {
     throw new Error(`CoinGecko request failed: ${res.status} ${res.statusText}`);
   }
@@ -91,7 +93,7 @@ export function formatJson(data) {
  * @param {Function} fetchImpl - fetch implementation (injectable for tests)
  * @returns {Promise<Record<string, number>>} map of currency -> price
  */
-export async function fetchHistoricalPrice(coin, dateStr, vs = ["usd"], fetchImpl = fetch) {
+export async function fetchHistoricalPrice(coin, dateStr, vs = ["usd"], fetchImpl = fetch, options = {}) {
   if (!coin || typeof coin !== "string") {
     throw new Error("coin must be a non-empty string");
   }
@@ -102,7 +104,9 @@ export async function fetchHistoricalPrice(coin, dateStr, vs = ["usd"], fetchImp
   }
   const apiDate = `${m[3]}-${m[2]}-${m[1]}`;
   const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/history?date=${apiDate}&localization=false`;
-  const res = await fetchImpl(url, { headers: { accept: "application/json" } });
+  const headers = { accept: "application/json" };
+  if (options && options.apiKey) headers["x-cg-demo-api-key"] = options.apiKey;
+  const res = await fetchImpl(url, { headers });
   if (!res.ok) {
     throw new Error(`CoinGecko request failed: ${res.status} ${res.statusText}`);
   }
