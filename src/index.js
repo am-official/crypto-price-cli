@@ -167,6 +167,39 @@ export function validateFlags({ watchSecs = 0, date = null } = {}) {
 }
 
 /**
+ * Disk cache for historical prices (immutable, so no TTL). Files live at
+ * <dir>/<coin>-<YYYY-MM-DD>.json. Returns null on miss or corrupt entry.
+ */
+export function historyCacheFile(dir, coin, dateStr) {
+  const safeCoin = String(coin).replace(/[^a-z0-9-]/gi, "_").toLowerCase();
+  return `${dir}/${safeCoin}-${dateStr}.json`;
+}
+
+export async function readHistoryCache(dir, coin, dateStr) {
+  try {
+    const { readFile } = await import("node:fs/promises");
+    const raw = await readFile(historyCacheFile(dir, coin, dateStr), "utf8");
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeHistoryCache(dir, coin, dateStr, prices) {
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  await mkdir(dir, { recursive: true });
+  await writeFile(historyCacheFile(dir, coin, dateStr), JSON.stringify(prices));
+}
+
+export function defaultHistoryCacheDir() {
+  const home = process.env.HOME || process.env.USERPROFILE || ".";
+  const base = process.env.XDG_CACHE_HOME || `${home}/.cache`;
+  return `${base}/crypto-price-cli/history`;
+}
+
+/**
  * Render a UTC timestamp header for --watch refreshes.
  * @param {Date} [now=new Date()]
  */
@@ -193,6 +226,11 @@ export async function fetchHistoricalPrice(coin, dateStr, vs = ["usd"], fetchImp
     throw new Error("date must be YYYY-MM-DD");
   }
   const apiDate = `${m[3]}-${m[2]}-${m[1]}`;
+  const cacheDir = options && options.cacheDir !== undefined ? options.cacheDir : defaultHistoryCacheDir();
+  if (cacheDir) {
+    const cached = await readHistoryCache(cacheDir, coin, dateStr);
+    if (cached) return cached;
+  }
   const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/history?date=${apiDate}&localization=false`;
   const headers = { accept: "application/json" };
   if (options && options.apiKey) headers["x-cg-demo-api-key"] = options.apiKey;
@@ -208,6 +246,9 @@ export async function fetchHistoricalPrice(coin, dateStr, vs = ["usd"], fetchImp
   const out = {};
   for (const c of vs) {
     if (prices[c] !== undefined) out[c] = prices[c];
+  }
+  if (cacheDir) {
+    await writeHistoryCache(cacheDir, coin, dateStr, out);
   }
   return out;
 }

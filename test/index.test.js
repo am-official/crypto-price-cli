@@ -1,6 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry, watchPrices, timestampHeader, validateFlags, parsePositiveInt } from "../src/index.js";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry, watchPrices, timestampHeader, validateFlags, parsePositiveInt, readHistoryCache, writeHistoryCache } from "../src/index.js";
+
+test("history disk cache round-trips", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "crypto-price-"));
+  assert.equal(await readHistoryCache(dir, "bitcoin", "2024-01-15"), null);
+  await writeHistoryCache(dir, "bitcoin", "2024-01-15", { usd: 42000 });
+  assert.deepEqual(await readHistoryCache(dir, "bitcoin", "2024-01-15"), { usd: 42000 });
+});
 
 test("parsePositiveInt falls back on garbage", () => {
   assert.equal(parsePositiveInt("10", 30), 10);
@@ -148,6 +158,22 @@ test("fetchHistoricalPrice parses response", async () => {
       json: async () => ({ market_data: { current_price: { usd: 42000, eur: 38000 } } }),
     };
   };
-  const out = await fetchHistoricalPrice("bitcoin", "2024-01-15", ["usd"], mock);
+  const out = await fetchHistoricalPrice("bitcoin", "2024-01-15", ["usd"], mock, { cacheDir: null });
   assert.deepEqual(out, { usd: 42000 });
+});
+
+test("fetchHistoricalPrice uses disk cache on second call", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "crypto-price-hist-"));
+  let calls = 0;
+  const mock = async () => {
+    calls++;
+    return {
+      ok: true, status: 200, statusText: "OK",
+      json: async () => ({ market_data: { current_price: { usd: 42000 } } }),
+    };
+  };
+  const opts = { cacheDir: dir };
+  assert.deepEqual(await fetchHistoricalPrice("bitcoin", "2024-01-15", ["usd"], mock, opts), { usd: 42000 });
+  assert.deepEqual(await fetchHistoricalPrice("bitcoin", "2024-01-15", ["usd"], mock, opts), { usd: 42000 });
+  assert.equal(calls, 1);
 });
