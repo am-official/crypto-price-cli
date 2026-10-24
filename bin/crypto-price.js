@@ -67,6 +67,12 @@ try {
     console.error("error: --watch needs a positive number of seconds");
     process.exit(1);
   }
+  const { validateFlags: checkFlags } = await import("../src/index.js");
+  const flagError = checkFlags({ watchSecs, date });
+  if (flagError) {
+    console.error(`error: ${flagError}`);
+    process.exit(1);
+  }
   if (watchSecs > 0) {
     const controller = new AbortController();
     process.once("SIGINT", () => controller.abort());

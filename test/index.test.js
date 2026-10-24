@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry, watchPrices, timestampHeader } from "../src/index.js";
+import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry, watchPrices, timestampHeader, validateFlags } from "../src/index.js";
+
+test("validateFlags rejects watch combined with date", () => {
+  assert.equal(validateFlags({ watchSecs: 30, date: "2024-01-15" }), "--watch and --date cannot be combined: historical prices are static, nothing to refresh.");
+  assert.equal(validateFlags({ watchSecs: 0, date: "2024-01-15" }), null);
+  assert.equal(validateFlags({ watchSecs: 30, date: null }), null);
+});
 
 test("timestampHeader formats UTC time", () => {
   assert.equal(timestampHeader(new Date("2026-10-24T15:04:05Z")), "[2026-10-24 15:04:05]");

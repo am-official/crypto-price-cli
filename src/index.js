@@ -148,6 +148,16 @@ export function formatJson(data) {
 }
 
 /**
+ * Validate CLI flag combinations. Returns an error message or null.
+ */
+export function validateFlags({ watchSecs = 0, date = null } = {}) {
+  if (watchSecs > 0 && date) {
+    return "--watch and --date cannot be combined: historical prices are static, nothing to refresh.";
+  }
+  return null;
+}
+
+/**
  * Render a UTC timestamp header for --watch refreshes.
  * @param {Date} [now=new Date()]
  */
