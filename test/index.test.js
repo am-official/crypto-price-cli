@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchPrices, formatPrices } from "../src/index.js";
+import { fetchPrices, formatPrices, formatJson } from "../src/index.js";
 
 test("fetchPrices validates input", async () => {
   await assert.rejects(() => fetchPrices([]), /non-empty array/);
@@ -25,4 +25,9 @@ test("fetchPrices throws on non-ok", async () => {
 test("formatPrices formats output", () => {
   const out = formatPrices({ bitcoin: { usd: 100, eur: 90 } }, ["usd", "eur"]);
   assert.equal(out, "bitcoin: USD: 100  EUR: 90");
+});
+
+test("formatJson formats output", () => {
+  const out = formatJson({ bitcoin: { usd: 100 } });
+  assert.equal(out, JSON.stringify({ bitcoin: { usd: 100 } }, null, 2));
 });

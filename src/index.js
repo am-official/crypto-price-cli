@@ -36,3 +36,7 @@ export function formatPrices(data, vs = ["usd"]) {
   }
   return lines.join("\n");
 }
+
+export function formatJson(data) {
+  return JSON.stringify(data, null, 2);
+}
