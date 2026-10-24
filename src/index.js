@@ -227,9 +227,14 @@ export async function fetchHistoricalPrice(coin, dateStr, vs = ["usd"], fetchImp
   }
   const apiDate = `${m[3]}-${m[2]}-${m[1]}`;
   const cacheDir = options && options.cacheDir !== undefined ? options.cacheDir : defaultHistoryCacheDir();
+  let union = null;
   if (cacheDir) {
-    const cached = await readHistoryCache(cacheDir, coin, dateStr);
-    if (cached) return cached;
+    union = await readHistoryCache(cacheDir, coin, dateStr);
+    if (union && vs.every((c) => union[c] !== undefined)) {
+      const out = {};
+      for (const c of vs) out[c] = union[c];
+      return out;
+    }
   }
   const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/history?date=${apiDate}&localization=false`;
   const headers = { accept: "application/json" };
@@ -248,7 +253,7 @@ export async function fetchHistoricalPrice(coin, dateStr, vs = ["usd"], fetchImp
     if (prices[c] !== undefined) out[c] = prices[c];
   }
   if (cacheDir) {
-    await writeHistoryCache(cacheDir, coin, dateStr, out);
+    await writeHistoryCache(cacheDir, coin, dateStr, { ...(union || {}), ...out });
   }
   return out;
 }

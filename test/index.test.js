@@ -5,6 +5,25 @@ import os from "node:os";
 import path from "node:path";
 import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry, watchPrices, timestampHeader, validateFlags, parsePositiveInt, readHistoryCache, writeHistoryCache } from "../src/index.js";
 
+test("fetchHistoricalPrice merges vs currencies in disk cache", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "crypto-price-vs-"));
+  await writeHistoryCache(dir, "bitcoin", "2024-01-15", { usd: 42000 });
+  let calls = 0;
+  const mock = async () => {
+    calls++;
+    return {
+      ok: true, status: 200, statusText: "OK",
+      json: async () => ({ market_data: { current_price: { usd: 42000, eur: 38000 } } }),
+    };
+  };
+  const opts = { cacheDir: dir };
+  assert.deepEqual(await fetchHistoricalPrice("bitcoin", "2024-01-15", ["usd", "eur"], mock, opts), { usd: 42000, eur: 38000 });
+  assert.equal(calls, 1);
+  // Now fully cached: no fetch, subset returned.
+  assert.deepEqual(await fetchHistoricalPrice("bitcoin", "2024-01-15", ["usd"], mock, opts), { usd: 42000 });
+  assert.equal(calls, 1);
+});
+
 test("history disk cache round-trips", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "crypto-price-"));
   assert.equal(await readHistoryCache(dir, "bitcoin", "2024-01-15"), null);
