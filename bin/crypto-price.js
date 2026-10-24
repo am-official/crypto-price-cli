@@ -70,9 +70,12 @@ try {
   if (watchSecs > 0) {
     const controller = new AbortController();
     process.once("SIGINT", () => controller.abort());
-    const { watchPrices } = await import("../src/index.js");
+    const { watchPrices, timestampHeader } = await import("../src/index.js");
     await watchPrices({
-      fetchOnce: () => showOnce(),
+      fetchOnce: () => {
+        if (!json) console.log(timestampHeader());
+        return showOnce();
+      },
       intervalMs: watchSecs * 1000,
       signal: controller.signal,
     });

@@ -148,6 +148,15 @@ export function formatJson(data) {
 }
 
 /**
+ * Render a UTC timestamp header for --watch refreshes.
+ * @param {Date} [now=new Date()]
+ */
+export function timestampHeader(now = new Date()) {
+  const iso = now.toISOString();
+  return `[${iso.slice(0, 10)} ${iso.slice(11, 19)}]`;
+}
+
+/**
  * Fetch the historical price of a coin on a given date.
  * @param {string} coin - CoinGecko coin id (e.g. "bitcoin")
  * @param {string} dateStr - date as YYYY-MM-DD
