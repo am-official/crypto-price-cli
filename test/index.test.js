@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin } from "../src/index.js";
+import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry } from "../src/index.js";
 
 test("fetchPrices validates input", async () => {
   await assert.rejects(() => fetchPrices([]), /non-empty array/);
@@ -19,8 +19,8 @@ test("fetchPrices parses response", async () => {
 
 test("fetchPrices throws on non-ok", async () => {
   clearCache();
-  const mock = async () => ({ ok: false, status: 429, statusText: "Too Many Requests", json: async () => ({}) });
-  await assert.rejects(() => fetchPrices(["bitcoin"], ["usd"], mock), /429/);
+  const mock = async () => ({ ok: false, status: 429, statusText: "Too Many Requests", headers: { get: () => null }, json: async () => ({}) });
+  await assert.rejects(() => fetchPrices(["bitcoin"], ["usd"], mock, { retryBaseMs: 1, sleepImpl: () => Promise.resolve() }), /429/);
 });
 
 test("formatPrices formats output", () => {
@@ -63,6 +63,32 @@ test("fetchPrices resolves aliases in request URL", async () => {
   await fetchPrices(["btc"], ["usd"], mock, { cacheTtlMs: 0 });
   assert.match(seen, /ids=bitcoin/);
   clearCache();
+});
+
+test("fetchWithRetry retries 429 then succeeds", async () => {
+  let calls = 0;
+  const waits = [];
+  const fail = () => ({ ok: false, status: 429, statusText: "Too Many Requests", headers: { get: () => null } });
+  const mock = async () => (++calls === 1 ? fail() : { ok: true, status: 200, statusText: "OK" });
+  const res = await fetchWithRetry(mock, "https://x", {}, { retries: 3, retryBaseMs: 10, sleepImpl: (ms) => { waits.push(ms); return Promise.resolve(); } });
+  assert.ok(res.ok);
+  assert.equal(calls, 2);
+  assert.deepEqual(waits, [10]);
+});
+
+test("fetchWithRetry gives up after retries", async () => {
+  const mock = async () => ({ ok: false, status: 429, statusText: "Too Many Requests", headers: { get: () => null } });
+  await assert.rejects(
+    () => fetchWithRetry(mock, "https://x", {}, { retries: 1, retryBaseMs: 1, sleepImpl: () => Promise.resolve() }),
+    /429/
+  );
+});
+
+test("fetchWithRetry does not retry 400", async () => {
+  let calls = 0;
+  const mock = async () => { calls++; return { ok: false, status: 400, statusText: "Bad", headers: { get: () => null } }; };
+  await assert.rejects(() => fetchWithRetry(mock, "https://x", {}, { sleepImpl: () => Promise.resolve() }), /400/);
+  assert.equal(calls, 1);
 });
 
 test("fetchHistoricalPrice validates date", async () => {

@@ -21,6 +21,47 @@ export function resolveCoin(input) {
   return COIN_ALIASES[key] || key;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Fetch with retries on rate-limit (429) and transient 5xx.
+ * Honors the Retry-After response header when present, otherwise
+ * exponential backoff (baseMs * 2^attempt). `sleepImpl` is injectable for tests.
+ */
+export async function fetchWithRetry(fetchImpl, url, init, options = {}) {
+  const retries = typeof options.retries === "number" ? options.retries : 3;
+  const baseMs = typeof options.retryBaseMs === "number" ? options.retryBaseMs : 1000;
+  const sleepImpl = options.sleepImpl || sleep;
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let res;
+    try {
+      res = await fetchImpl(url, init);
+    } catch (err) {
+      lastError = err;
+      if (attempt === retries) break;
+      await sleepImpl(baseMs * 2 ** attempt);
+      continue;
+    }
+    if (res.ok) return res;
+    lastError = new Error(`CoinGecko request failed: ${res.status} ${res.statusText}`);
+    const retryable = res.status === 429 || (res.status >= 500 && res.status < 600);
+    if (!retryable || attempt === retries) break;
+    let waitMs = baseMs * 2 ** attempt;
+    const retryAfter = res.headers && typeof res.headers.get === "function"
+      ? res.headers.get("retry-after")
+      : null;
+    if (retryAfter) {
+      const secs = Number(retryAfter);
+      if (Number.isFinite(secs) && secs >= 0) waitMs = Math.min(secs * 1000, 60000);
+    }
+    await sleepImpl(waitMs);
+  }
+  throw lastError;
+}
+
 const cache = new Map();
 
 function cacheKey(ids, vs) {
@@ -56,7 +97,7 @@ export async function fetchPrices(ids, vs = ["usd"], fetchImpl = fetch, options 
   const url = `${API_URL}?${params.toString()}`;
   const headers = { accept: "application/json" };
   if (options.apiKey) headers["x-cg-demo-api-key"] = options.apiKey;
-  const res = await fetchImpl(url, { headers });
+  const res = await fetchWithRetry(fetchImpl, url, { headers }, options);
   if (!res.ok) {
     throw new Error(`CoinGecko request failed: ${res.status} ${res.statusText}`);
   }
@@ -106,7 +147,7 @@ export async function fetchHistoricalPrice(coin, dateStr, vs = ["usd"], fetchImp
   const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin)}/history?date=${apiDate}&localization=false`;
   const headers = { accept: "application/json" };
   if (options && options.apiKey) headers["x-cg-demo-api-key"] = options.apiKey;
-  const res = await fetchImpl(url, { headers });
+  const res = await fetchWithRetry(fetchImpl, url, { headers }, options || {});
   if (!res.ok) {
     throw new Error(`CoinGecko request failed: ${res.status} ${res.statusText}`);
   }
