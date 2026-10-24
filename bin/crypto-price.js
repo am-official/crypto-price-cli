@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { fetchPrices, formatPrices, formatJson, fetchHistoricalPrice, parsePositiveInt } from "../src/index.js";
+import { fetchPrices, formatPrices, formatJson, fetchHistoricalPrice, parsePositiveInt, listHistoryCache, defaultHistoryCacheDir } from "../src/index.js";
 
 const args = process.argv.slice(2);
 const apiKey = process.env.COINGECKO_API_KEY || process.env.CG_API_KEY || "";
@@ -20,6 +20,7 @@ Options:
   --watch[=SECS]      Refresh continuously (default every 30s, Ctrl+C stops)
   --interval=SECS     Alias for --watch=SECS
   --count=N           Stop after N refreshes (for scripts/cron)
+  --dump-cache        List cached historical prices and exit
   --json              Machine-readable JSON output
   -h, --help          Show this help
 
@@ -43,7 +44,7 @@ const watchArg = args.find((a) => a === "--watch" || a.startsWith("--watch=") ||
 const watchSecs = watchArg ? parsePositiveInt(watchArg.split("=")[1] || "30", 30) : 0;
 const countArg = args.find((a) => a.startsWith("--count="));
 const maxTicks = countArg ? parsePositiveInt(countArg.split("=")[1], 0) : 0;
-const filtered = args.filter((a) => a !== "--json" && !a.startsWith("--date=") && a !== "--watch" && !a.startsWith("--watch=") && a !== "--interval" && !a.startsWith("--interval=") && !a.startsWith("--count="));
+const filtered = args.filter((a) => a !== "--json" && !a.startsWith("--date=") && a !== "--watch" && !a.startsWith("--watch=") && a !== "--interval" && !a.startsWith("--interval=") && !a.startsWith("--count=") && a !== "--dump-cache");
 const coins = (filtered[0] || "bitcoin").split(",").map((s) => s.trim()).filter(Boolean);
 const vs = (filtered[1] || "usd").split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -67,6 +68,17 @@ async function showOnce() {
 }
 
 try {
+  if (args.includes("--dump-cache")) {
+    const entries = await listHistoryCache(defaultHistoryCacheDir());
+    if (json) {
+      console.log(formatJson(entries));
+    } else if (entries.length === 0) {
+      console.log("history cache is empty");
+    } else {
+      for (const e of entries) console.log(`${e.coin} on ${e.date}: ${e.currencies.join(", ").toUpperCase()}`);
+    }
+    process.exit(0);
+  }
   if (watchArg && !(watchSecs > 0)) {
     console.error("error: --watch needs a positive number of seconds");
     process.exit(1);

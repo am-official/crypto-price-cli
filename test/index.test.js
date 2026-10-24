@@ -3,7 +3,16 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry, watchPrices, timestampHeader, validateFlags, parsePositiveInt, readHistoryCache, writeHistoryCache } from "../src/index.js";
+import { fetchPrices, formatPrices, formatJson, clearCache, fetchHistoricalPrice, resolveCoin, fetchWithRetry, watchPrices, timestampHeader, validateFlags, parsePositiveInt, readHistoryCache, writeHistoryCache, listHistoryCache } from "../src/index.js";
+
+test("listHistoryCache enumerates stored entries", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "crypto-price-list-"));
+  assert.deepEqual(await listHistoryCache(dir), []);
+  await writeHistoryCache(dir, "bitcoin", "2024-01-15", { usd: 42000, eur: 38000 });
+  assert.deepEqual(await listHistoryCache(dir), [
+    { coin: "bitcoin", date: "2024-01-15", currencies: ["eur", "usd"] },
+  ]);
+});
 
 test("fetchHistoricalPrice merges vs currencies in disk cache", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "crypto-price-vs-"));

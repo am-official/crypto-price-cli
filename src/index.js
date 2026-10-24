@@ -200,6 +200,31 @@ export function defaultHistoryCacheDir() {
 }
 
 /**
+ * List history cache entries: [{coin, date, currencies[]}]. Missing dir → [].
+ */
+export async function listHistoryCache(dir) {
+  const { readdir, readFile } = await import("node:fs/promises");
+  let files;
+  try {
+    files = await readdir(dir);
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (const f of files.sort()) {
+    const m = /^(.+)-(\d{4}-\d{2}-\d{2})\.json$/.exec(f);
+    if (!m) continue;
+    try {
+      const data = JSON.parse(await readFile(`${dir}/${f}`, "utf8"));
+      out.push({ coin: m[1], date: m[2], currencies: Object.keys(data || {}).sort() });
+    } catch {
+      continue;
+    }
+  }
+  return out;
+}
+
+/**
  * Render a UTC timestamp header for --watch refreshes.
  * @param {Date} [now=new Date()]
  */
