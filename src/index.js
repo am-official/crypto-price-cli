@@ -137,7 +137,8 @@ export function clearCache() {
 export function formatPrices(data, vs = ["usd"]) {
   const lines = [];
   for (const [coin, prices] of Object.entries(data)) {
-    const parts = vs.map((c) => `${c.toUpperCase()}: ${prices[c]}`).join("  ");
+    // A partial response (rate limiting, an unsupported fiat) can leave a currency or a whole coin out.
+    const parts = vs.map((c) => `${c.toUpperCase()}: ${prices?.[c] ?? "n/a"}`).join("  ");
     lines.push(`${coin}: ${parts}`);
   }
   return lines.join("\n");

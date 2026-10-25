@@ -84,6 +84,21 @@ test("formatPrices formats output", () => {
   assert.equal(out, "bitcoin: USD: 100  EUR: 90");
 });
 
+test("formatPrices marks a currency missing from the response as n/a", () => {
+  const out = formatPrices({ bitcoin: { usd: 42000 } }, ["usd", "eur"]);
+  assert.equal(out, "bitcoin: USD: 42000  EUR: n/a");
+});
+
+test("formatPrices never prints undefined or null", () => {
+  const out = formatPrices({ bitcoin: { usd: null }, ethereum: {}, dogecoin: null }, ["usd", "eur"]);
+  assert.equal(out, "bitcoin: USD: n/a  EUR: n/a\nethereum: USD: n/a  EUR: n/a\ndogecoin: USD: n/a  EUR: n/a");
+  assert.doesNotMatch(out, /undefined|null/);
+});
+
+test("formatPrices keeps a price of 0", () => {
+  assert.equal(formatPrices({ bitcoin: { usd: 0 } }, ["usd"]), "bitcoin: USD: 0");
+});
+
 test("fetchPrices caches results", async () => {
   clearCache();
   let calls = 0;
